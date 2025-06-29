@@ -1,49 +1,105 @@
-import requests
 import redis
 from pymongo import MongoClient
-from config import REDIS_HOST, REDIS_PORT, MONGO_URI, MONGO_DB_NAME, MONGO_COLLECTION_NAME
+import praw
+from prawcore.exceptions import PrawcoreException
+from config import (
+    REDIS_HOST,
+    REDIS_PORT,
+    MONGO_URI,
+    MONGO_DB_NAME,
+    MONGO_COLLECTION_NAME,
+    REDDIT_CLIENT_ID,
+    REDDIT_CLIENT_SECRET,
+    REDDIT_USER_AGENT,
+)
 
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
+# Initialize Redis and MongoDB clients
+redis_client = redis.Redis(
+    host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True
+)
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[MONGO_DB_NAME]
 collection = db[MONGO_COLLECTION_NAME]
 
+# Initialize PRAW Reddit instance
+try:
+    reddit = praw.Reddit(
+        client_id=REDDIT_CLIENT_ID,
+        client_secret=REDDIT_CLIENT_SECRET,
+        user_agent=REDDIT_USER_AGENT,
+    )
+    reddit.read_only = True  # We are only reading data
+except PrawcoreException as e:
+    print(f"Error initializing PRAW: {e}")
+    reddit = None
+
 LAST_POST_ID_KEY = "last_post_id"
+
 
 def get_last_post_id():
     return redis_client.get(LAST_POST_ID_KEY)
 
+
 def set_last_post_id(post_id):
     redis_client.set(LAST_POST_ID_KEY, post_id)
 
+
+def fetch_comments_for_submission(submission):
+    comments_data = []
+    try:
+        submission.comments.replace_more(limit=0)  # Flatten comment tree
+        for comment in submission.comments.list():
+            if hasattr(comment, "body"):
+                comments_data.append(
+                    {
+                        "id": comment.id,
+                        "author": (
+                            comment.author.name if comment.author else "[deleted]"
+                        ),
+                        "body": comment.body,
+                        "created_utc": comment.created_utc,
+                    }
+                )
+    except PrawcoreException as e:
+        print(f"Error fetching comments for submission {submission.id}: {e}")
+    return comments_data
+
+
 def fetch_new_reddit_posts():
+    if not reddit:
+        print("PRAW not initialized. Skipping Reddit crawl.")
+        return
+
     last_post_id = get_last_post_id()
-    headers = {"User-Agent": "fastapi-reddit-crawler"}
-    url = "https://www.reddit.com/r/all/new.json?limit=10"
+    new_posts = []
 
     try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        posts = response.json()["data"]["children"]
-
-        new_posts = []
-        for post in posts:
-            post_data = post["data"]
-            if post_data["id"] == last_post_id:
+        # Fetch new posts from r/all
+        for submission in reddit.subreddit("all").new(limit=10):
+            if submission.id == last_post_id:
                 break
-            new_posts.append({
-                "id": post_data["id"],
-                "title": post_data["title"],
-                "url": post_data["url"],
-                "description": post_data["selftext"],
-                "created_utc": post_data["created_utc"]
-            })
+
+            comments = fetch_comments_for_submission(submission)
+
+            new_posts.append(
+                {
+                    "id": submission.id,
+                    "title": submission.title,
+                    "url": submission.url,
+                    "description": submission.selftext,
+                    "created_utc": submission.created_utc,
+                    "comments": comments,
+                }
+            )
 
         if new_posts:
+            # Insert new posts (in reverse order to maintain chronological order in DB)
             collection.insert_many(list(reversed(new_posts)))
             set_last_post_id(new_posts[0]["id"])
 
-        print(f"Fetched {len(new_posts)} new posts")
+        print(f"Fetched {len(new_posts)} new posts from Reddit")
 
+    except PrawcoreException as e:
+        print(f"Error fetching posts from Reddit: {e}")
     except Exception as e:
-        print(f"Error fetching posts: {e}")
+        print(f"An unexpected error occurred during Reddit crawl: {e}")
