@@ -8,8 +8,18 @@ from hackernews_crawler.hackernews_crawler import (
     HACKERNEWS_FETCH_JOB_ID, 
     HACKERNEWS_PROCESS_JOB_ID
 )
+from youtube_crawler.youtube_crawler import (
+    youtube_trending_task,
+    youtube_comments_task,
+    YOUTUBE_TRENDING_JOB_ID,
+    YOUTUBE_COMMENTS_JOB_ID
+)
 from apscheduler.triggers.interval import IntervalTrigger
-from config import REDDIT_CRAWL_INTERVAL_SECONDS, HACKERNEWS_FETCH_INTERVAL_SECONDS
+from config import (
+    REDDIT_CRAWL_INTERVAL_SECONDS, 
+    HACKERNEWS_FETCH_INTERVAL_SECONDS,
+    YOUTUBE_FETCH_INTERVAL_SECONDS
+)
 
 
 @asynccontextmanager
@@ -53,6 +63,30 @@ async def lifespan(app: FastAPI):
         )
         print("Hacker News process job scheduled to run every 30 seconds.")
 
+        # Schedule the YouTube trending videos job
+        scheduler.add_job(
+            func=youtube_trending_task,
+            trigger=IntervalTrigger(seconds=YOUTUBE_FETCH_INTERVAL_SECONDS),
+            id=YOUTUBE_TRENDING_JOB_ID,
+            replace_existing=True,
+            misfire_grace_time=30,
+        )
+        print(
+            f"YouTube trending videos job scheduled to run every {YOUTUBE_FETCH_INTERVAL_SECONDS} seconds."
+        )
+
+        # Schedule the YouTube comments job
+        scheduler.add_job(
+            func=youtube_comments_task,
+            trigger=IntervalTrigger(seconds=YOUTUBE_FETCH_INTERVAL_SECONDS),
+            id=YOUTUBE_COMMENTS_JOB_ID,
+            replace_existing=True,
+            misfire_grace_time=30,
+        )
+        print(
+            f"YouTube comments job scheduled to run every {YOUTUBE_FETCH_INTERVAL_SECONDS} seconds."
+        )
+
         yield
 
     except Exception as e:
@@ -64,6 +98,8 @@ async def lifespan(app: FastAPI):
             scheduler.remove_job(REDDIT_JOB_ID)
             scheduler.remove_job(HACKERNEWS_FETCH_JOB_ID)
             scheduler.remove_job(HACKERNEWS_PROCESS_JOB_ID)
+            scheduler.remove_job(YOUTUBE_TRENDING_JOB_ID)
+            scheduler.remove_job(YOUTUBE_COMMENTS_JOB_ID)
             scheduler.shutdown()
             print("Scheduler shut down successfully.")
         except Exception as e:
@@ -72,7 +108,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Social Crawler API",
-    description="A FastAPI application for crawling Reddit and Hacker News posts and comments",
+    description="A FastAPI application for crawling Reddit, Hacker News, and YouTube posts and comments",
     version="1.0.0",
     lifespan=lifespan
 )

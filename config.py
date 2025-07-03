@@ -21,3 +21,8 @@ REDDIT_CRAWL_INTERVAL_SECONDS = int(os.getenv("REDDIT_CRAWL_INTERVAL_SECONDS", 3
 # Hacker News API Configuration
 HACKERNEWS_BASE_URL = "https://hacker-news.firebaseio.com/v0"
 HACKERNEWS_FETCH_INTERVAL_SECONDS = int(os.getenv("HACKERNEWS_FETCH_INTERVAL_SECONDS", 60))
+
+# YouTube API Configuration
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "your_youtube_api_key")
+YOUTUBE_BASE_URL = "https://www.googleapis.com/youtube/v3"
+YOUTUBE_FETCH_INTERVAL_SECONDS = int(os.getenv("YOUTUBE_FETCH_INTERVAL_SECONDS", 300))
