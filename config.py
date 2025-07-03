@@ -17,3 +17,7 @@ REDDIT_USER_AGENT = os.getenv("REDDIT_USER_AGENT", "fastapi-reddit-crawler")
 REDDIT_USERNAME = os.getenv("REDDIT_USERNAME", "your_reddit_username")
 REDDIT_PASSWORD = os.getenv("REDDIT_PASSWORD", "your_reddit_password")
 REDDIT_CRAWL_INTERVAL_SECONDS = int(os.getenv("REDDIT_CRAWL_INTERVAL_SECONDS", 300))
+
+# Hacker News API Configuration
+HACKERNEWS_BASE_URL = "https://hacker-news.firebaseio.com/v0"
+HACKERNEWS_FETCH_INTERVAL_SECONDS = int(os.getenv("HACKERNEWS_FETCH_INTERVAL_SECONDS", 60))
