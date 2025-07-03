@@ -7,6 +7,7 @@ from config import (
     MONGO_DB_NAME,
     YOUTUBE_API_KEY,
     YOUTUBE_BASE_URL,
+    YOUTUBE_COMMENTS_TTL_SECONDS,
 )
 
 # Constants for MongoDB collections
@@ -16,6 +17,13 @@ YOUTUBE_COMMENTS_COLLECTION_NAME = "youtube_latest_comments"
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[MONGO_DB_NAME]
 comments_collection = db[YOUTUBE_COMMENTS_COLLECTION_NAME]
+
+# Create TTL index for YouTube comments
+try:
+    comments_collection.create_index("fetched_at", expireAfterSeconds=YOUTUBE_COMMENTS_TTL_SECONDS)
+    print(f"Created TTL index for YouTube comments with {YOUTUBE_COMMENTS_TTL_SECONDS} seconds expiry")
+except Exception as e:
+    print(f"Error creating TTL index for YouTube comments: {e}")
 
 
 def get_popular_video_ids() -> List[str]:

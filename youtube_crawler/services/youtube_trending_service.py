@@ -7,6 +7,7 @@ from config import (
     MONGO_DB_NAME,
     YOUTUBE_API_KEY,
     YOUTUBE_BASE_URL,
+    YOUTUBE_TRENDING_TTL_SECONDS,
 )
 
 # Constants for MongoDB collections
@@ -16,6 +17,13 @@ YOUTUBE_TRENDING_COLLECTION_NAME = "youtube_trending_videos"
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[MONGO_DB_NAME]
 trending_collection = db[YOUTUBE_TRENDING_COLLECTION_NAME]
+
+# Create TTL index for YouTube trending videos
+try:
+    trending_collection.create_index("fetched_at", expireAfterSeconds=YOUTUBE_TRENDING_TTL_SECONDS)
+    print(f"Created TTL index for YouTube trending videos with {YOUTUBE_TRENDING_TTL_SECONDS} seconds expiry")
+except Exception as e:
+    print(f"Error creating TTL index for YouTube trending videos: {e}")
 
 
 def fetch_trending_videos_api() -> List[Dict[str, Any]]:

@@ -9,6 +9,7 @@ from config import (
     MONGO_URI,
     MONGO_DB_NAME,
     HACKERNEWS_BASE_URL,
+    HACKERNEWS_TTL_SECONDS,
 )
 
 # Constants for Redis keys and MongoDB collections
@@ -25,6 +26,13 @@ redis_client = redis.Redis(
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[MONGO_DB_NAME]
 hackernews_collection = db[HACKERNEWS_COLLECTION_NAME]
+
+# Create TTL index for Hacker News posts
+try:
+    hackernews_collection.create_index("created_at", expireAfterSeconds=HACKERNEWS_TTL_SECONDS)
+    print(f"Created TTL index for Hacker News posts with {HACKERNEWS_TTL_SECONDS} seconds expiry")
+except Exception as e:
+    print(f"Error creating TTL index for Hacker News posts: {e}")
 
 
 def get_latest_post_ids() -> List[int]:

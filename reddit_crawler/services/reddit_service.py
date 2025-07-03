@@ -2,6 +2,7 @@ import redis
 from pymongo import MongoClient
 import praw
 from prawcore.exceptions import PrawcoreException
+from datetime import datetime
 from config import (
     REDIS_HOST,
     REDIS_PORT,
@@ -11,6 +12,7 @@ from config import (
     REDDIT_CLIENT_ID,
     REDDIT_CLIENT_SECRET,
     REDDIT_USER_AGENT,
+    REDDIT_TTL_SECONDS,
 )
 
 # Initialize Redis client (for background tasks only)
@@ -22,6 +24,13 @@ redis_client = redis.Redis(
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[MONGO_DB_NAME]
 collection = db[MONGO_COLLECTION_NAME]
+
+# Create TTL index for Reddit posts
+try:
+    collection.create_index("created_at", expireAfterSeconds=REDDIT_TTL_SECONDS)
+    print(f"Created TTL index for Reddit posts with {REDDIT_TTL_SECONDS} seconds expiry")
+except Exception as e:
+    print(f"Error creating TTL index for Reddit posts: {e}")
 
 # Initialize PRAW Reddit instance
 try:
@@ -101,6 +110,7 @@ def fetch_new_reddit_posts():
                     "url": submission.url,
                     "description": submission.selftext,
                     "created_utc": submission.created_utc,
+                    "created_at": datetime.fromtimestamp(submission.created_utc),
                     "comments": comments,
                 }
             )
