@@ -13,10 +13,12 @@ from config import (
     REDDIT_USER_AGENT,
 )
 
-# Initialize Redis and MongoDB clients
+# Initialize Redis client (for background tasks only)
 redis_client = redis.Redis(
     host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True
 )
+
+# Initialize MongoDB client
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[MONGO_DB_NAME]
 collection = db[MONGO_COLLECTION_NAME]
@@ -33,18 +35,28 @@ except PrawcoreException as e:
     print(f"Error initializing PRAW: {e}")
     reddit = None
 
-LAST_POST_ID_KEY = "last_post_id"
-
 
 def get_last_post_id():
-    return redis_client.get(LAST_POST_ID_KEY)
+    """Get the last processed post ID from MongoDB."""
+    # Find the most recent post by created_utc timestamp
+    last_post = collection.find_one(
+        sort=[("created_utc", -1)]
+    )
+    return last_post["id"] if last_post else None
 
 
 def set_last_post_id(post_id):
-    redis_client.set(LAST_POST_ID_KEY, post_id)
+    """Store the last processed post ID in MongoDB for tracking."""
+    # Update or insert the last post ID in a separate collection
+    db.crawler_state.update_one(
+        {"key": "last_post_id"},
+        {"$set": {"value": post_id}},
+        upsert=True
+    )
 
 
 def fetch_comments_for_submission(submission):
+    """Fetch comments for a Reddit submission."""
     comments_data = []
     try:
         submission.comments.replace_more(limit=0)  # Flatten comment tree
@@ -66,6 +78,7 @@ def fetch_comments_for_submission(submission):
 
 
 def fetch_new_reddit_posts():
+    """Fetch and save new Reddit posts using MongoDB for state tracking."""
     if not reddit:
         print("PRAW not initialized. Skipping Reddit crawl.")
         return

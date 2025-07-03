@@ -2,9 +2,11 @@ from apscheduler.triggers.interval import IntervalTrigger
 from scheduler import scheduler
 from reddit_crawler.services.reddit_service import fetch_new_reddit_posts
 
-# Unique job ID for Reddit crawler
-REDDIT_JOB_ID = "reddit-crawler-job"
+# Constants for job configuration
+REDDIT_JOB_ID: str = "reddit-crawler-job"
 
-def reddit_crawl_task():
+
+def reddit_crawl_task() -> None:
+    """Execute the Reddit crawling task."""
     print("Starting Reddit crawl task...")
     fetch_new_reddit_posts()
